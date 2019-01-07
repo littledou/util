@@ -9,16 +9,16 @@ import android.view.SurfaceView;
  * Created by dou on 2017/11/6.
  */
 
-public class PreviewView extends SurfaceView implements SurfaceHolder.Callback {
+public class PreviewSurfaceView extends SurfaceView implements SurfaceHolder.Callback {
 
 
     private SurfaceHolder mSurfaceHolder;
-    CameraInterface cameraInterface;
+    CameraController cameraController;
 
-    public PreviewView(Context context, CameraInterface cameraInterface) {
+    public PreviewSurfaceView(Context context, CameraController cameraController) {
         super(context);
         mSurfaceHolder = getHolder();
-        this.cameraInterface = cameraInterface;
+        this.cameraController = cameraController;
         mSurfaceHolder.setFormat(PixelFormat.TRANSPARENT);//translucent半透明 transparent透明
         mSurfaceHolder.setType(SurfaceHolder.SURFACE_TYPE_PUSH_BUFFERS);
         mSurfaceHolder.addCallback(this);
@@ -27,8 +27,8 @@ public class PreviewView extends SurfaceView implements SurfaceHolder.Callback {
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
-        cameraInterface.setPreviewDisplay(mSurfaceHolder);
-        cameraInterface.startPreview();
+        cameraController.setPreviewDisplay(mSurfaceHolder);
+        cameraController.startPreview();
     }
 
     @Override
@@ -37,7 +37,7 @@ public class PreviewView extends SurfaceView implements SurfaceHolder.Callback {
 
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
-        cameraInterface.stopPreview();
-        cameraInterface.releaseCamera();
+        cameraController.stopPreview();
+        cameraController.releaseCamera();
     }
 }

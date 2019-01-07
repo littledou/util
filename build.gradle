@@ -1,4 +1,5 @@
 apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
 
 android {
     compileSdkVersion rootProject.ext.androidCompileSdkVersion
@@ -7,7 +8,7 @@ android {
         minSdkVersion rootProject.ext.androidMinSdkVersion
         targetSdkVersion rootProject.ext.androidTargetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "1.00.001"
 
     }
 
@@ -28,5 +29,9 @@ dependencies {
     implementation rootProject.ext.dependency["rxandroid"]
     implementation rootProject.ext.dependency["butterknife"]
     annotationProcessor rootProject.ext.dependency["butterknife-compiler"]
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 
+}
+repositories {
+    mavenCentral()
 }

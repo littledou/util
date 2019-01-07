@@ -1,9 +1,11 @@
 package cn.readsense.camera;
 
 import android.app.Activity;
+import android.app.admin.DevicePolicyManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.ImageFormat;
+import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -11,42 +13,43 @@ import android.view.SurfaceHolder;
 import java.io.IOException;
 import java.util.List;
 
+import cn.readsense.controller.camera.ICameraController;
+import cn.readsense.exception.CameraDisabledException;
+import cn.readsense.exception.NoCameraException;
+
 /**
  * Created by dou on 2017/11/6.
  */
 
-public class CameraInterface {
+public class CameraController implements ICameraController {
 
-    private static final String TAG = "CameraInterface";
+    private static final String TAG = "CameraController";
 
     private Camera camera = null;
     private Camera.Parameters parameters;
     private int preview_width, preview_height;
+
     private int facing;
 
     private boolean isWithBufferCallback = false;//是否使用了带缓冲区的回调
     private boolean isWithCallback = false;//是否使用了带缓冲区的回调
     boolean isPreviewing;
 
-    public CameraInterface() {
+    public CameraController() {
     }
 
-    /**
-     * Camera 连接打开
-     */
-    public void openCamera(int cameraFacing) {
-        facing = cameraFacing;
-        if (camera != null) {
-            stopPreview();
-            releaseCamera();
+    public void openCamera(int cameraFacing) throws NoCameraException {
+        try {
+            facing = cameraFacing;
+            if (camera != null) {
+                stopPreview();
+                releaseCamera();
+            }
+            camera = Camera.open(cameraFacing);
+            parameters = camera.getParameters();
+        } catch (Exception e) {
+            throw new NoCameraException();
         }
-        camera = Camera.open(cameraFacing);
-        parameters = camera.getParameters();
-    }
-
-    public void setParamFocusMode(String mode) {
-        if (isSupportFocusMode(mode))
-            parameters.setFocusMode(mode);
     }
 
     public void setParamPreviewSize(int width, int height) {
@@ -80,6 +83,15 @@ public class CameraInterface {
         }
     }
 
+    public void setPreviewTexture(SurfaceTexture mTexture) {
+        try {
+            if (camera != null)
+                camera.setPreviewTexture(mTexture);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void addPreviewCallback(Camera.PreviewCallback callback) {
         isWithCallback = true;
         camera.setPreviewCallback(callback);
@@ -97,7 +109,7 @@ public class CameraInterface {
     }
 
     public void removePreviewCallbackWithBuffer() {
-        if(camera!=null) {
+        if (camera != null) {
             isWithBufferCallback = false;
             camera.setPreviewCallbackWithBuffer(null);
         }
@@ -131,17 +143,6 @@ public class CameraInterface {
     }
 
 
-    public void tackPicture(Camera.PictureCallback mJpegPictureCallback) {
-        if (isPreviewing && (camera != null)) {
-            camera.takePicture(mShutterCallback, null, mJpegPictureCallback);
-        }
-    }
-
-    private Camera.ShutterCallback mShutterCallback = new Camera.ShutterCallback() {
-        public void onShutter() {
-        }
-    };
-
     private int getCameraDisplayOrientation(Context context, int cameraId) {
         Camera.CameraInfo info = new Camera.CameraInfo();
         Camera.getCameraInfo(cameraId, info);
@@ -172,12 +173,21 @@ public class CameraInterface {
         return result;
     }
 
-    boolean hasCameraDevice(Context ctx) {
-        return ctx.getPackageManager()
-                .hasSystemFeature(PackageManager.FEATURE_CAMERA);
+    public void hasCameraDevice(Context ctx) throws CameraDisabledException, NoCameraException {
+        // Check if device policy has disabled the camera.
+
+        DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(Context.DEVICE_POLICY_SERVICE);
+        final boolean hasSystemFeature = ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA);
+        if (dpm.getCameraDisabled(null) || !hasSystemFeature) {
+            throw new CameraDisabledException();
+        }
+        int numberOfCameras = Camera.getNumberOfCameras();
+        if (numberOfCameras == 0) {
+            throw new NoCameraException();
+        }
     }
 
-    boolean hasCameraFacing(int facing) {
+    public boolean hasCameraFacing(int facing) {
         int number_of_camera = Camera.getNumberOfCameras();
         for (int i = 0; i < number_of_camera; i++) {
             Camera.CameraInfo info = new Camera.CameraInfo();
@@ -188,7 +198,7 @@ public class CameraInterface {
         return false;
     }
 
-    boolean hasSupportSize(int width, int height) {
+    public boolean hasSupportSize(int width, int height) {
         List<Camera.Size> previewSizes = parameters.getSupportedPreviewSizes();
         for (int i = 0; i < previewSizes.size(); i++) {
             Camera.Size size = previewSizes.get(i);
@@ -200,9 +210,28 @@ public class CameraInterface {
         return false;
     }
 
-    private boolean isSupportFocusMode(String mode) {
-        List<String> modes = parameters.getSupportedFocusModes();
-        return modes.contains(mode);
+    public Camera.Size getOptimalPreviewSize(int width, int height) {
+        Camera.Size optimalSize = null;
+        double minHeightDiff = Double.MAX_VALUE;
+        double minWidthDiff = Double.MAX_VALUE;
+        List<Camera.Size> sizes = parameters.getSupportedPreviewSizes();
+        if (sizes == null) return null;
+        //找到宽度差距最小的
+        for (Camera.Size size : sizes) {
+            if (Math.abs(size.width - width) < minWidthDiff) {
+                minWidthDiff = Math.abs(size.width - width);
+            }
+        }
+        //在宽度差距最小的里面，找到高度差距最小的
+        for (Camera.Size size : sizes) {
+            if (Math.abs(size.width - width) == minWidthDiff) {
+                if (Math.abs(size.height - height) < minHeightDiff) {
+                    optimalSize = size;
+                    minHeightDiff = Math.abs(size.height - height);
+                }
+            }
+        }
+        return optimalSize;
     }
 
     public void printSupportPreviewSize() {
@@ -223,11 +252,16 @@ public class CameraInterface {
         }
     }
 
-    public void printSupportFocusMode() {
-        List<String> focusModes = parameters.getSupportedFocusModes();
-        for (String mode : focusModes) {
-            Log.i(TAG, "focusModes--" + mode);
-        }
+
+    public int getPreview_width() {
+        return preview_width;
     }
 
+    public int getPreview_height() {
+        return preview_height;
+    }
+
+    public int getFacing() {
+        return facing;
+    }
 }

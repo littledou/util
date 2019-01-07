@@ -22,7 +22,6 @@ import retrofit2.converter.gson.GsonConverterFactory;
 
 public class NetManager {
 
-
     private static String token = "";
 
     private Retrofit retrofit;
@@ -135,7 +134,6 @@ public class NetManager {
                 builder.cacheControl(CacheControl.FORCE_CACHE);
             }
             request = builder.header("Authorization", token)
-                    .header("Content-Type", "application/json")
                     .header("Accept", "application/json")
                     .build();
 

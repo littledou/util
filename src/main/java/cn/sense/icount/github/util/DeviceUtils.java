@@ -10,6 +10,7 @@ import android.os.PowerManager;
 import android.provider.Settings;
 
 import java.io.File;
+import java.io.FileReader;
 import java.net.NetworkInterface;
 import java.util.Collections;
 import java.util.List;
@@ -83,6 +84,10 @@ public class DeviceUtils {
         if (!"02:00:00:00:00:00".equals(macAddress)) {
             return macAddress;
         }
+        macAddress = getMacByEth();
+        if (!"02:00:00:00:00:00".equals(macAddress)) {
+            return macAddress;
+        }
         return "please open wifi";
     }
 
@@ -149,6 +154,29 @@ public class DeviceUtils {
                     }
                 }
             }
+        }
+        return "02:00:00:00:00:00";
+    }
+
+    /**
+     * 查看eth0的mac地址
+     * 需要root权限
+     */
+    public static String getMacByEth() {
+        try {
+            FileReader reader = new FileReader("/sys/class/net/eth0/address");
+            StringBuilder builder = new StringBuilder();
+            char[] buffer = new char[4096];
+            int readLength = reader.read(buffer);
+            while (readLength >= 0) {
+                builder.append(buffer, 0, readLength);
+                readLength = reader.read(buffer);
+            }
+            reader.close();
+            return builder.toString().trim();
+        } catch (Exception e) {
+            e.printStackTrace();
+
         }
         return "02:00:00:00:00:00";
     }

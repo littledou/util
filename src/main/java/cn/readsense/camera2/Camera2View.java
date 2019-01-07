@@ -4,8 +4,8 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.graphics.ImageFormat;
 import android.graphics.Matrix;
+import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.graphics.SurfaceTexture;
 import android.hardware.camera2.CameraAccessException;
@@ -20,7 +20,6 @@ import android.media.ImageReader;
 import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
-import android.os.Trace;
 import android.support.annotation.NonNull;
 import android.support.annotation.RequiresApi;
 import android.support.v4.app.ActivityCompat;
@@ -30,21 +29,19 @@ import android.util.Size;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.RelativeLayout;
-import android.widget.Toast;
 
+import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import cn.readsense.permissions.PermissionListener;
-import cn.readsense.permissions.PermissionsUtil;
+import cn.sense.icount.github.util.DeviceUtils;
 
 @RequiresApi (api = Build.VERSION_CODES.LOLLIPOP)
 public class Camera2View extends RelativeLayout {
     private static final String TAG = "Camera2View";
 
     private Context context;
-    private final static String permission_camera = Manifest.permission.CAMERA;
 
     /**
      * An additional thread for running tasks that shouldn't block the UI.
@@ -95,10 +92,8 @@ public class Camera2View extends RelativeLayout {
     private int camera_facing;
 
 
-    //data callback
-    private byte[][] yuvBytes = new byte[3][];
-    private int yRowStride;
-
+    int data_real_width = 0;
+    int data_real_height = 0;
 
     public Camera2View(Context context) {
         this(context, null);
@@ -111,7 +106,7 @@ public class Camera2View extends RelativeLayout {
         addView(mTextureView);
     }
 
-    public void setUpCameraParams(int width, int height, int camera_facing) {
+    public void showCameraView(int width, int height, int camera_facing) {
         PREVIEWWIDTH = width;
         PREVIEWHEIGHT = height;
 
@@ -124,30 +119,12 @@ public class Camera2View extends RelativeLayout {
             throw new Error("device not found previewSize: " + width + "*" + height);
     }
 
-    public void resumeCamera2() {
-        if (PermissionsUtil.hasPermission(context, permission_camera, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            setUpCamera();
-        } else {
-            PermissionsUtil.requestPermission(context, new PermissionListener() {
-                @Override
-                public void permissionGranted(@NonNull String[] permission) {
-                    setUpCamera();
-                }
-
-                @Override
-                public void permissionDenied(@NonNull String[] permission) {
-                    Toast.makeText(context, "用户拒绝了访问摄像头", Toast.LENGTH_LONG).show();
-                }
-            }, permission_camera, Manifest.permission.WRITE_EXTERNAL_STORAGE);
-        }
-    }
-
     public void pauseCamera2() {
         closeCamera();
         stopBackgroundThread();
     }
 
-    private void setUpCamera() {
+    public void resumeCamera2() {
         startBackgroundThread();
 
         if (mTextureView.isAvailable()) {
@@ -159,8 +136,8 @@ public class Camera2View extends RelativeLayout {
 
 
     private void openCamera(int width, int height) {
-        setUpCameraOutputs();
         configureTransform(width, height);
+        setUpCameraOutputs();
         Activity activity = (Activity) context;
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -197,15 +174,13 @@ public class Camera2View extends RelativeLayout {
                             throw new Error("Camera StreamConfigurationMap is null, no prewsize");
                         }
 
-
                         mImageReader = ImageReader.newInstance(PREVIEWWIDTH, PREVIEWHEIGHT,
-                                ImageFormat.YUV_420_888, /*maxImages*/2);
+                                PixelFormat.RGBA_8888, /*maxImages*/2);
                         mImageReader.setOnImageAvailableListener(new ImageReader.OnImageAvailableListener() {
                             @Override
                             public void onImageAvailable(ImageReader reader) {
                                 Log.d(TAG, "onImageAvailable frameRate: " + frameRate);
 
-                                Trace.beginSection("dd");
                                 if (System.currentTimeMillis() - time > 1000) {
                                     frameRate = frameCount;
                                     frameCount = 0;
@@ -216,12 +191,52 @@ public class Camera2View extends RelativeLayout {
                                 Image image = null;
                                 try {
                                     image = reader.acquireLatestImage();
+                                    Image.Plane[] planes = image.getPlanes();
+                                    int width = image.getWidth();//设置的宽
+                                    int height = image.getHeight();//设置的高
+                                    int pixelStride = planes[0].getPixelStride();//像素个数，RGBA为4
+                                    int rowStride = planes[0].getRowStride();//这里除pixelStride就是真实宽度
+                                    int rowPadding = rowStride - pixelStride * width;//计算多余宽度
+
+                                    byte[] data = new byte[rowStride * height];//创建byte
+                                    ByteBuffer buffer = planes[0].getBuffer();//获得buffer
+                                    buffer.get(data);//将buffer数据写入byte中
+
+                                    //到这里为止就拿到了图像数据，你可以转换为yuv420，或者录制成H264
+
+                                    //这里我提供一段转换为Bitmap的代码
+
+                                    //这是最终数据，通过循环将内存对齐多余的部分删除掉
+                                    // 正常ARGB的数据应该是width*height*4，但是因为是int所以不用乘4
+                                    int[] pixelData = new int[width * height];
+
+                                    int offset = 0;
+                                    int index = 0;
+                                    for (int i = 0; i < height; ++i) {
+                                        for (int j = 0; j < width; ++j) {
+                                            int pixel = 0;
+                                            pixel |= (data[offset] & 0xff) << 16;     // R
+                                            pixel |= (data[offset + 1] & 0xff) << 8;  // G
+                                            pixel |= (data[offset + 2] & 0xff);       // B
+                                            pixel |= (data[offset + 3] & 0xff) << 24; // A
+                                            pixelData[index++] = pixel;
+                                            offset += pixelStride;
+                                        }
+                                        offset += rowPadding;
+                                    }
+
+//                                    Bitmap bitmap = Bitmap.createBitmap(pixelData,
+//                                            width, height,
+//                                            Bitmap.Config.ARGB_8888);//创建bitmap
+
+//                                    BitmapUtil.saveBitmap(bitmap, "/sdcard/test.jpg");
+
 //                                    final Image.Plane[] planes = image.getPlanes();
 //                                    Camera2Util.fillBytes(planes, yuvBytes);
 //                                    yRowStride = planes[0].getRowStride();
 //                                    final int uvRowStride = planes[1].getRowStride();
 //                                    final int uvPixelStride = planes[1].getPixelStride();
-
+//
 //                                    final int iw = PREVIEWWIDTH;
 //                                    final int ih = PREVIEWHEIGHT;
 //                                    byte[] y = yuvBytes[0];
@@ -241,7 +256,6 @@ public class Camera2View extends RelativeLayout {
                                 } finally {
                                     if (image != null)
                                         image.close();
-                                    Trace.endSection();
                                 }
 
 
@@ -291,16 +305,32 @@ public class Camera2View extends RelativeLayout {
         RectF bufferRect = new RectF(0, 0, mPreviewSize.getHeight(), mPreviewSize.getWidth());
         float centerX = viewRect.centerX();
         float centerY = viewRect.centerY();
-        if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
+        final String model = DeviceUtils.getModel();
+
+        data_real_width = viewWidth;
+        data_real_height = viewHeight;
+
+        if (model.equals("rk3399-mid")) {
+            bufferRect = new RectF(0, 0, mPreviewSize.getWidth(), mPreviewSize.getHeight());
             bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
             matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
             float scale = Math.max(
                     (float) viewHeight / mPreviewSize.getHeight(),
                     (float) viewWidth / mPreviewSize.getWidth());
             matrix.postScale(scale, scale, centerX, centerY);
-            matrix.postRotate(90 * (rotation - 2), centerX, centerY);
-        } else if (Surface.ROTATION_180 == rotation) {
-            matrix.postRotate(180, centerX, centerY);
+        } else {
+            if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
+                bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
+                matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
+                float scale = Math.max(
+                        (float) viewHeight / mPreviewSize.getHeight(),
+                        (float) viewWidth / mPreviewSize.getWidth());
+                matrix.postScale(scale, scale, centerX, centerY);
+                matrix.postRotate(90 * (rotation - 2), centerX, centerY);
+            } else if (Surface.ROTATION_180 == rotation) {
+                matrix.postRotate(180, centerX, centerY);
+            }
+
         }
         mTextureView.setTransform(matrix);
     }
@@ -427,7 +457,7 @@ public class Camera2View extends RelativeLayout {
      * Starts a background thread and its {@link Handler}.
      */
     private void startBackgroundThread() {
-        mBackgroundThread = new HandlerThread("CameraBackground");
+        mBackgroundThread = new HandlerThread("CameraBackground-" + System.currentTimeMillis());
         mBackgroundThread.start();
         mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
     }

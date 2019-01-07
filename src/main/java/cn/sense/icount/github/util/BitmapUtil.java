@@ -376,7 +376,8 @@ public class BitmapUtil {
                     break;
             }
         } catch (IOException localIOException) {
-            localIOException.printStackTrace();
+            DLog.d("localIOException");
+//            localIOException.printStackTrace();
         }
         return i;
     }
