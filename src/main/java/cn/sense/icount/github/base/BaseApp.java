@@ -4,7 +4,6 @@ import android.app.Application;
 import android.content.Context;
 import android.content.res.Resources;
 
-import cn.sense.icount.github.util.CrashUtils;
 import cn.sense.icount.github.util.SPUtils;
 
 /**
@@ -29,7 +28,6 @@ public class BaseApp extends Application {
         app = this;
         SPUtils.init(this);
         Utils.init(this);
-        CrashUtils.getInstance().init();
 
     }
 }

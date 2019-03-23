@@ -17,14 +17,6 @@ import static cn.sense.icount.github.util.ConvertUtils.bytes2HexString;
 import static cn.sense.icount.github.util.ConvertUtils.hexString2Bytes;
 
 
-/**
- * <pre>
- *     author: Blankj
- *     blog  : http://blankj.com
- *     time  : 2016/8/2
- *     desc  : 加密解密相关的工具类
- * </pre>
- */
 public class EncryptUtils {
 
     private EncryptUtils() {

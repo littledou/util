@@ -10,15 +10,14 @@ import android.os.HandlerThread;
 import android.os.Looper;
 import android.os.Message;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.SurfaceView;
+import android.view.View;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 
 import java.util.Locale;
 
 import cn.readsense.exception.CameraDisabledException;
-import cn.readsense.exception.CameraNotSupportException;
 import cn.readsense.exception.NoCameraException;
 import cn.sense.icount.github.util.DLog;
 
@@ -32,6 +31,9 @@ public class CameraView extends RelativeLayout {
     private static final String TAG = "CameraView";
     private static final int MAIN_RET = 0x101;
     private static final int THREAD_RET = 0x102;
+    public static final int MODE_SURFACEVIEW = 0x103;
+    public static final int MODE_TEXTUREVIEW = 0x104;
+    private int mode;
     private Context context;
     private int oritationDisplay = -1;
 
@@ -80,8 +82,18 @@ public class CameraView extends RelativeLayout {
         super(context, attrs);
         this.context = context;
         setBackgroundColor(Color.BLACK);
-        cameraController = new CameraController();
+
         DLog.d("CameraView init");
+    }
+
+    public View getShowView() {
+        switch (mode) {
+            case MODE_SURFACEVIEW:
+                return previewSurfaceView;
+            case MODE_TEXTUREVIEW:
+                return previewTextureView;
+        }
+        return null;
     }
 
 
@@ -96,47 +108,42 @@ public class CameraView extends RelativeLayout {
     }
 
     public void showCameraView(int width, int height, int facing) {
+        showCameraView(width, height, facing, MODE_SURFACEVIEW);
+    }
 
+    public void showCameraView(int width, int height, int facing, final int mode) {
+        cameraController = new CameraController();
+        this.mode = mode;
         try {
-            cameraController.hasCameraDevice(context);
-
-//            if (cameraController.hasCameraFacing(facing)) {
             PREVIEW_WIDTH = width;
             PREVIEW_HEIGHT = height;
             FACING = facing;
 
-            setUpCamera();
-//            } else {
-//                Toast.makeText(context, String.format(Locale.CHINA, "device not found camera device, CamreaId: %d!", facing), Toast.LENGTH_SHORT).show();
-//            }
+            cameraController.hasCameraDevice(context);
 
-
-        } catch (CameraNotSupportException e) {
-            e.printStackTrace();
-        } catch (NoCameraException e) {
-            e.printStackTrace();
-        } catch (CameraDisabledException e) {
+        } catch (NoCameraException | CameraDisabledException e) {
             e.printStackTrace();
         }
 
-    }
-
-    int frameCount = 0;
-    int frameRate = 0;
-    long time = 0;
-
-    private void setUpCamera() throws CameraNotSupportException {
-
-        settingTextureView();
+        switch (mode) {
+            case MODE_SURFACEVIEW:
+                settingSurfaceView();
+                break;
+            case MODE_TEXTUREVIEW:
+                settingTextureView();
+                break;
+        }
 
         try {
 
             cameraController.openCamera(FACING);
 
             Camera.Size prewSize = cameraController.getOptimalPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+            if (prewSize.width != width) {
+                prewSize = null;
+            }
             if (prewSize != null) {
-                PREVIEW_WIDTH = prewSize.width;
-                PREVIEW_HEIGHT = prewSize.height;
+
                 cameraController.setParamPreviewSize(PREVIEW_WIDTH, PREVIEW_HEIGHT);
                 try {
                     cameraController.setDisplayOrientation(context, oritationDisplay);
@@ -147,12 +154,12 @@ public class CameraView extends RelativeLayout {
                     cameraController.addPreviewCallbackWithBuffer(new Camera.PreviewCallback() {
                         @Override
                         public void onPreviewFrame(byte[] data, Camera camera) {//数据预览回掉
-                            Log.d("onPreviewFrame", "onPreviewFrame frameRate: " + frameRate);
 
                             if (System.currentTimeMillis() - time > 1000) {
                                 frameRate = frameCount;
                                 frameCount = 0;
                                 time = System.currentTimeMillis();
+//                                Log.d("onPreviewFrame", "onPreviewFrame frameRate: " + frameRate + " prew:" + mode);
                             }
                             frameCount++;
                             camera.addCallbackBuffer(data);
@@ -164,14 +171,19 @@ public class CameraView extends RelativeLayout {
                     });
 
                 cameraController.setParamEnd();
+            } else {
+                releaseCamera();
+                Toast.makeText(context, String.format(Locale.CHINA, "can not find preview size %d*%d", PREVIEW_WIDTH, PREVIEW_WIDTH), Toast.LENGTH_SHORT).show();
             }
 
         } catch (Exception e) {
-
             Toast.makeText(context, String.format(Locale.CHINA, "open camera failed, CamreaId: %d!", FACING), Toast.LENGTH_SHORT).show();
-            throw new CameraNotSupportException();
         }
     }
+
+    int frameCount = 0;
+    int frameRate = 0;
+    long time = 0;
 
 
     private void settingSurfaceView() {
@@ -193,7 +205,6 @@ public class CameraView extends RelativeLayout {
         LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
         previewTextureView = new PreviewTextureView(context, cameraController, PREVIEW_WIDTH, PREVIEW_HEIGHT);
         addView(previewTextureView, params);
-
 
         if (draw_view != null) {
             params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
@@ -232,11 +243,11 @@ public class CameraView extends RelativeLayout {
                         while (is_thread_run) {
 
                             if (!isBufferready) {
-//                                try {
-//                                    Thread.sleep(28);
-//                                } catch (InterruptedException e) {
-//                                    e.printStackTrace();
-//                                }
+                                try {
+                                    Thread.sleep(28);
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
                                 continue;
                             }
                             synchronized (Lock) {
@@ -263,14 +274,20 @@ public class CameraView extends RelativeLayout {
 
     public void releaseCamera() {
         is_thread_run = false;
-        previewFrameCallback = null;
+
+        if (cameraController != null) {
+            removeDataCallback();
+            cameraController.stopPreview();
+            cameraController.releaseCamera();
+        }
+        removeAllViews();
         if (handler != null)
             handler.removeMessages(0);
         if (handler_main != null)
             handler_main.removeMessages(0);
         if (myHandlerThread != null)
             myHandlerThread.quitSafely();
-        cameraController.releaseCamera();
+
     }
 
     private void removeDataCallback() {
@@ -286,19 +303,6 @@ public class CameraView extends RelativeLayout {
         Object analyseData(byte[] data);
 
         void analyseDataEnd(Object t);
-    }
-
-    public int moveCameraFacing() {
-        removeDataCallback();
-        FACING = (FACING == Camera.CameraInfo.CAMERA_FACING_BACK) ?
-                Camera.CameraInfo.CAMERA_FACING_FRONT : Camera.CameraInfo.CAMERA_FACING_BACK;
-
-        cameraController.removePreviewCallbackWithBuffer();
-        cameraController.stopPreview();
-        cameraController.releaseCamera();
-        removeAllViews();
-        showCameraView(PREVIEW_WIDTH, PREVIEW_HEIGHT, FACING);
-        return FACING;
     }
 
     public void setOritationDisplay(int oritationDisplay) {

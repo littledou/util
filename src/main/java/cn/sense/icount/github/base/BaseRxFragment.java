@@ -2,15 +2,12 @@ package cn.sense.icount.github.base;
 
 import android.os.Bundle;
 
-import cn.sense.icount.github.entity.HttpResult;
-import io.reactivex.ObservableTransformer;
 import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.disposables.Disposable;
 
 /**
  * 管理RxJava生命周期，避免内存泄漏
  * <p>
- * Created by Weiss on 2016/12/23.
  */
 
 public abstract class BaseRxFragment extends BaseCoreFragment {
@@ -18,20 +15,6 @@ public abstract class BaseRxFragment extends BaseCoreFragment {
     private CompositeDisposable disposables2Stop;// 管理Stop取消订阅者者
     private CompositeDisposable disposables2Destroy;// 管理Destroy取消订阅者者
 
-    protected abstract int getLayoutId();
-
-    protected abstract void initView();
-
-    /**
-     * Rx优雅处理服务器返回
-     *
-     * @param <T>
-     * @return
-     */
-    public <T> ObservableTransformer<HttpResult<T>, T> handleResult() {
-        BaseRxActivity baseActivity = (BaseRxActivity) getActivity();
-        return baseActivity.handleResult();
-    }
 
     public boolean addRxStop(Disposable disposable) {
         if (disposables2Stop == null) {

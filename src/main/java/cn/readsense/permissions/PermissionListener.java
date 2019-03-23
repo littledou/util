@@ -1,6 +1,6 @@
 package cn.readsense.permissions;
 
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 public interface PermissionListener {
     /**

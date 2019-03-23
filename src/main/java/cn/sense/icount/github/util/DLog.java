@@ -151,9 +151,9 @@ public class DLog {
 
     public static void printLine(String tag, boolean isTop) {
         if (isTop) {
-            Log.d(tag, "╔═══════════════════════════════════════════════════════════════════════════════════════");
+            i(tag, "╔═══════════════════════════════════════════════════════════════════════════════════════");
         } else {
-            Log.d(tag, "╚═══════════════════════════════════════════════════════════════════════════════════════");
+            i(tag, "╚═══════════════════════════════════════════════════════════════════════════════════════");
         }
     }
 
@@ -179,10 +179,9 @@ public class DLog {
         message = headString + LINE_SEPARATOR + message;
         String[] lines = message.split(LINE_SEPARATOR);
         for (String line : lines) {
-            Log.d(tag, line);
+            i(tag, line);
         }
         printLine(tag, false);
     }
-
 
 }

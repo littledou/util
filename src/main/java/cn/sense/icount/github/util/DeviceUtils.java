@@ -59,7 +59,7 @@ public class DeviceUtils {
      *
      * @return AndroidID
      */
-    @SuppressLint("HardwareIds")
+    @SuppressLint ("HardwareIds")
     public static String getAndroidID() {
         return Settings.Secure.getString(Utils.getContext().getContentResolver(), Settings.Secure.ANDROID_ID);
     }
@@ -73,19 +73,19 @@ public class DeviceUtils {
      */
     public static String getMacAddress() {
         String macAddress = getMacAddressByWifiInfo();
-        if (!"02:00:00:00:00:00".equals(macAddress)) {
+        if (!"02:00:00:00:00:00".equals(macAddress) && macAddress != null) {
             return macAddress;
         }
         macAddress = getMacAddressByNetworkInterface();
-        if (!"02:00:00:00:00:00".equals(macAddress)) {
+        if (!"02:00:00:00:00:00".equals(macAddress) && macAddress != null) {
             return macAddress;
         }
         macAddress = getMacAddressByFile();
-        if (!"02:00:00:00:00:00".equals(macAddress)) {
+        if (!"02:00:00:00:00:00".equals(macAddress) && macAddress != null) {
             return macAddress;
         }
         macAddress = getMacByEth();
-        if (!"02:00:00:00:00:00".equals(macAddress)) {
+        if (!"02:00:00:00:00:00".equals(macAddress) && macAddress != null) {
             return macAddress;
         }
         return "please open wifi";
@@ -97,12 +97,12 @@ public class DeviceUtils {
      *
      * @return MAC地址
      */
-    @SuppressLint("HardwareIds")
+    @SuppressLint ("HardwareIds")
     private static String getMacAddressByWifiInfo() {
         try {
-            @SuppressLint("WifiManagerLeak") WifiManager wifi = (WifiManager) Utils.getContext().getSystemService(Context.WIFI_SERVICE);
+            @SuppressLint ("WifiManagerLeak") WifiManager wifi = (WifiManager) Utils.getContext().getSystemService(Context.WIFI_SERVICE);
             if (wifi != null) {
-                @SuppressLint("MissingPermission") WifiInfo info = wifi.getConnectionInfo();
+                @SuppressLint ("MissingPermission") WifiInfo info = wifi.getConnectionInfo();
                 if (info != null) return info.getMacAddress();
             }
         } catch (Exception e) {

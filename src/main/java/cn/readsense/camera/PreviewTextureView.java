@@ -8,23 +8,30 @@ import android.graphics.SurfaceTexture;
 import android.view.Surface;
 import android.view.TextureView;
 
-import cn.sense.icount.github.util.DeviceUtils;
-
 public class PreviewTextureView extends TextureView implements TextureView.SurfaceTextureListener {
 
     CameraController cameraController;
     Context context;
     SurfaceTexture surfaceTexture;
-    int preview_width;
-    int preview_height;
+    int buffer_width;
+    int buffer_height;
+    int vw;
+    int vh;
+    private boolean flip = false;
+
+    public float getScale() {
+        return scale;
+    }
+
+    private float scale = 1f;
 
     public PreviewTextureView(Context context, CameraController cameraController, int PREVIEW_WIDTH, int PREVIEW_HEIGHT) {
         super(context);
         this.cameraController = cameraController;
         this.context = context;
         setSurfaceTextureListener(this);
-        preview_width = PREVIEW_WIDTH;
-        preview_height = PREVIEW_HEIGHT;
+        buffer_width = PREVIEW_WIDTH;
+        buffer_height = PREVIEW_HEIGHT;
     }
 
     @Override
@@ -33,11 +40,15 @@ public class PreviewTextureView extends TextureView implements TextureView.Surfa
         cameraController.setPreviewTexture(surface);
         cameraController.startPreview();
         configureTransform(width, height);
+        vw = width;
+        vh = height;
     }
 
     @Override
     public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
         configureTransform(width, height);
+        vw = width;
+        vh = height;
     }
 
     @Override
@@ -51,6 +62,20 @@ public class PreviewTextureView extends TextureView implements TextureView.Surfa
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
     }
 
+    private boolean selfConfig = false;
+
+    public void setConfigureTransform(int bufferWidth, int bufferHeight) {
+        setConfigureTransform(bufferWidth, bufferHeight, false);
+    }
+
+    public void setConfigureTransform(int bufferWidth, int bufferHeight, boolean flip) {
+        this.buffer_width = bufferWidth;
+        this.buffer_height = bufferHeight;
+        selfConfig = true;
+        this.flip = flip;
+        configureTransform(vw, vh);
+    }
+
     private void configureTransform(int viewWidth, int viewHeight) {
         Activity activity = (Activity) context;
         if (null == activity) {
@@ -59,26 +84,32 @@ public class PreviewTextureView extends TextureView implements TextureView.Surfa
         int rotation = activity.getWindowManager().getDefaultDisplay().getRotation();
         Matrix matrix = new Matrix();
         RectF viewRect = new RectF(0, 0, viewWidth, viewHeight);
-        RectF bufferRect = new RectF(0, 0, preview_height, preview_width);
+        RectF bufferRect = new RectF(0, 0, buffer_width, buffer_height);
         float centerX = viewRect.centerX();
         float centerY = viewRect.centerY();
-        final String model = DeviceUtils.getModel();
 
-        if (model.equals("rk3399-mid")) {
-            bufferRect = new RectF(0, 0, preview_width, preview_height);
+        if (selfConfig) {
+            bufferRect = new RectF(0, 0, buffer_width, buffer_height);
             bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
             matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
-            float scale = Math.max(
-                    (float) viewHeight / preview_height,
-                    (float) viewWidth / preview_width);
-            matrix.postScale(scale, scale, centerX, centerY);
+            scale = Math.max(
+                    (float) viewHeight / buffer_height,
+                    (float) viewWidth / buffer_width);
+            if (flip)
+                matrix.postScale(-scale, scale, centerX, centerY);
+            else
+                matrix.postScale(scale, scale, centerX, centerY);
+//            matrix.postScale(-1,1,centerX,centerY);
+//            matrix.postRotate(-90,centerX, centerY);
         } else {
             if (Surface.ROTATION_90 == rotation || Surface.ROTATION_270 == rotation) {
                 bufferRect.offset(centerX - bufferRect.centerX(), centerY - bufferRect.centerY());
+                centerX = viewRect.centerX();
+                centerY = viewRect.centerY();
                 matrix.setRectToRect(viewRect, bufferRect, Matrix.ScaleToFit.FILL);
-                float scale = Math.max(
-                        (float) viewHeight / preview_height,
-                        (float) viewWidth / preview_width);
+                scale = Math.max(
+                        (float) viewHeight / buffer_height,
+                        (float) viewWidth / buffer_width);
                 matrix.postScale(scale, scale, centerX, centerY);
                 matrix.postRotate(90 * (rotation - 2), centerX, centerY);
             } else if (Surface.ROTATION_180 == rotation) {

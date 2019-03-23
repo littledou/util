@@ -4,14 +4,6 @@ import java.io.File;
 
 import cn.sense.icount.github.base.Utils;
 
-/**
- * <pre>
- *     author: Blankj
- *     blog  : http://blankj.com
- *     time  : 2016/9/27
- *     desc  : 清除相关工具类
- * </pre>
- */
 public class CleanUtils {
 
     private CleanUtils() {
