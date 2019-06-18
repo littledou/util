@@ -65,7 +65,6 @@ public class CameraView extends RelativeLayout {
     }
 
     public void setDrawView() {
-        is_thread_run = true;
         draw_view = new SurfaceView(context);
         draw_view.setZOrderOnTop(true);
         draw_view.getHolder().setFormat(PixelFormat.TRANSLUCENT);
@@ -112,6 +111,7 @@ public class CameraView extends RelativeLayout {
     }
 
     public void showCameraView(int width, int height, int facing, final int mode) {
+
         cameraController = new CameraController();
         this.mode = mode;
         try {
@@ -215,8 +215,10 @@ public class CameraView extends RelativeLayout {
     private void addCallback() {
 
         if (previewFrameCallback != null) {
-            buffer = new byte[PREVIEW_WIDTH * PREVIEW_HEIGHT * 2];
-            temp = new byte[PREVIEW_WIDTH * PREVIEW_HEIGHT * 2];
+            if (buffer == null)
+                buffer = new byte[PREVIEW_WIDTH * PREVIEW_HEIGHT * 2];
+            if (temp == null)
+                temp = new byte[PREVIEW_WIDTH * PREVIEW_HEIGHT * 2];
 
             handler_main = new Handler(Looper.getMainLooper()) {
                 @Override
@@ -230,9 +232,10 @@ public class CameraView extends RelativeLayout {
             };
 
             //run data analyse
-            myHandlerThread = new HandlerThread("handler-thread-" + System.currentTimeMillis());
+            myHandlerThread = new HandlerThread("camera-thread-" + System.currentTimeMillis());
             //开启一个线程
             myHandlerThread.start();
+            is_thread_run = true;
             //在这个线程中创建一个handler对象
             handler = new Handler(myHandlerThread.getLooper()) {
                 @Override
@@ -286,7 +289,7 @@ public class CameraView extends RelativeLayout {
         if (handler_main != null)
             handler_main.removeMessages(0);
         if (myHandlerThread != null)
-            myHandlerThread.quitSafely();
+            myHandlerThread.quit();
 
     }
 
@@ -299,6 +302,10 @@ public class CameraView extends RelativeLayout {
         this.previewFrameCallback = callback;
     }
 
+    public void setExposureCompensation(int limit) {
+        cameraController.setExposureCompensation(limit);
+    }
+
     public interface PreviewFrameCallback {
         Object analyseData(byte[] data);
 
@@ -307,5 +314,13 @@ public class CameraView extends RelativeLayout {
 
     public void setOritationDisplay(int oritationDisplay) {
         this.oritationDisplay = oritationDisplay;
+    }
+
+    /**
+     * camera params
+     */
+
+    public void setAutoExposureLock() {
+
     }
 }

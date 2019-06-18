@@ -4,9 +4,11 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.os.Bundle;
 
+import androidx.annotation.IdRes;
 import androidx.annotation.LayoutRes;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+
 import butterknife.ButterKnife;
 import butterknife.Unbinder;
 import cn.readsense.permissions.PermissionListener;
@@ -16,7 +18,7 @@ import cn.sense.icount.github.util.ToastUtils;
 
 
 public abstract class BaseCoreActivity extends AppCompatActivity {
-    ProgressDialog progressDialog;
+    public ProgressDialog progressDialog;
     Unbinder unbinder;
     public Context context;
 
@@ -104,4 +106,90 @@ public abstract class BaseCoreActivity extends AppCompatActivity {
     protected abstract int getLayoutId();
 
     protected abstract void initView();
+
+
+    /**
+     * 添加fragment
+     *
+     * @param fragment
+     * @param frameId
+     */
+    protected void addFragment(BaseCoreFragment fragment, @IdRes int frameId) {
+        Utils.checkNotNull(fragment);
+        getSupportFragmentManager().beginTransaction()
+                .add(frameId, fragment, fragment.getClass().getSimpleName())
+                .addToBackStack(fragment.getClass().getSimpleName())
+                .commitAllowingStateLoss();
+
+    }
+
+
+    /**
+     * 替换fragment
+     *
+     * @param fragment
+     * @param frameId
+     */
+    protected void replaceFragment(BaseCoreFragment fragment, @IdRes int frameId) {
+        Utils.checkNotNull(fragment);
+        getSupportFragmentManager().beginTransaction()
+                .replace(frameId, fragment, fragment.getClass().getSimpleName())
+                .addToBackStack(fragment.getClass().getSimpleName())
+                .commitAllowingStateLoss();
+
+    }
+
+
+    /**
+     * 隐藏fragment
+     *
+     * @param fragment
+     */
+    protected void hideFragment(BaseCoreFragment fragment) {
+        Utils.checkNotNull(fragment);
+        getSupportFragmentManager().beginTransaction()
+                .hide(fragment)
+                .commitAllowingStateLoss();
+
+    }
+
+
+    /**
+     * 显示fragment
+     *
+     * @param fragment
+     */
+    protected void showFragment(BaseCoreFragment fragment) {
+        Utils.checkNotNull(fragment);
+        getSupportFragmentManager().beginTransaction()
+                .show(fragment)
+                .commitAllowingStateLoss();
+
+    }
+
+
+    /**
+     * 移除fragment
+     *
+     * @param fragment
+     */
+    protected void removeFragment(BaseCoreFragment fragment) {
+        Utils.checkNotNull(fragment);
+        getSupportFragmentManager().beginTransaction()
+                .remove(fragment)
+                .commitAllowingStateLoss();
+
+    }
+
+
+    /**
+     * 弹出栈顶部的Fragment
+     */
+    protected void popFragment() {
+        if (getSupportFragmentManager().getBackStackEntryCount() > 1) {
+            getSupportFragmentManager().popBackStack();
+        } else {
+            finish();
+        }
+    }
 }

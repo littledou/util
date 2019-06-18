@@ -33,7 +33,6 @@ public class CameraController implements ICameraController {
 
     private boolean isWithBufferCallback = false;//是否使用了带缓冲区的回调
     private boolean isWithCallback = false;//是否使用了带缓冲区的回调
-    boolean isPreviewing;
 
     public CameraController() {
     }
@@ -59,8 +58,9 @@ public class CameraController implements ICameraController {
     }
 
     public void setParamEnd() {
-        if (camera != null && parameters != null)
+        if (camera != null && parameters != null) {
             camera.setParameters(parameters);
+        }
     }
 
     public void setDisplayOrientation(Context context, int result) {
@@ -119,7 +119,6 @@ public class CameraController implements ICameraController {
     public void startPreview() {
         if (camera != null) {
             camera.startPreview();
-            isPreviewing = true;
         }
     }
 
@@ -130,7 +129,6 @@ public class CameraController implements ICameraController {
             if (isWithCallback)
                 removePreviewCallback();
             camera.stopPreview();
-            isPreviewing = false;
         }
     }
 
@@ -177,7 +175,7 @@ public class CameraController implements ICameraController {
         // Check if device policy has disabled the camera.
 
         DevicePolicyManager dpm = (DevicePolicyManager) ctx.getSystemService(Context.DEVICE_POLICY_SERVICE);
-        final boolean hasSystemFeature = ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA);
+        final boolean hasSystemFeature = ctx.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY);
         if (dpm.getCameraDisabled(null) || !hasSystemFeature) {
             throw new CameraDisabledException();
         }
@@ -263,5 +261,10 @@ public class CameraController implements ICameraController {
 
     public int getFacing() {
         return facing;
+    }
+
+    public void setExposureCompensation(int value) {
+        parameters.setExposureCompensation(value);
+        camera.setParameters(parameters);
     }
 }

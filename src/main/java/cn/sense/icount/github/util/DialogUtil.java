@@ -23,15 +23,20 @@ public class DialogUtil {
         return builder;
     }
 
-    public static AlertDialog.Builder dialogBuilder(Context context, int title, View view) {
+    public static AlertDialog.Builder dialogBuilder(Context context, String title, View view) {
         AlertDialog.Builder builder = new AlertDialog.Builder(context);
         if (view != null) {
             builder.setView(view);
         }
-        if (title > 0) {
+        if (!StringUtils.isEmpty(title)) {
             builder.setTitle(title);
         }
         return builder;
+    }
+
+    public static AlertDialog.Builder dialogBuilder(Context context, int titleResId, View view) {
+        String title = titleResId > 0 ? context.getResources().getString(titleResId) : null;
+        return dialogBuilder(context, title, view);
     }
 
     public static AlertDialog.Builder dialogBuilder(Context context, int titleResId, int msgResId) {

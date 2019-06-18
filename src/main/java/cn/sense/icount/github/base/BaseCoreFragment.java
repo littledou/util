@@ -42,4 +42,6 @@ public abstract class BaseCoreFragment extends Fragment {
     protected abstract int getLayoutId();
 
     protected abstract void initView();
+
+
 }

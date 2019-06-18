@@ -2,6 +2,9 @@ package cn.sense.icount.github.net;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import javax.net.ssl.HostnameVerifier;
@@ -24,32 +27,24 @@ public class NetManager {
 
     private static String token = "";
 
+    static Map<String, String> heads = new HashMap<>();
+
     private Retrofit retrofit;
 
-    static volatile NetManager instance;
+    private boolean needCache = true;
+
     public static final String MEDIA_TYPE_TEXT = "text/plain";
     public static final String MEDIA_TYPE_JSON = "application/json;charset=utf-8";
     public static final String MEDIA_TYPE_IMAGE = "image/*";
     public static final String MEDIA_TYPE_FORM = "multipart/form-data";
     public static final String ASYNC = "async";
 
-    private NetManager() {
-
+    public NetManager(boolean needCache) {
+        this.needCache = needCache;
     }
 
-    public void setToken(String token1) {
-        token = token1;
-    }
-
-    public static NetManager getInstance() {
-        if (instance == null) {
-            synchronized (NetManager.class) {
-                if (instance == null) {
-                    instance = new NetManager();
-                }
-            }
-        }
-        return instance;
+    public void addHeads(String key, String value) {
+        heads.put(key, value);
     }
 
     public Retrofit initRetrofit(String api_base) {
@@ -62,22 +57,26 @@ public class NetManager {
         return retrofit;
     }
 
-
     private OkHttpClient defaultOkHttpClient() {
         OkHttpClient.Builder client = new OkHttpClient.Builder();
         client.writeTimeout(30 * 1000, TimeUnit.MILLISECONDS);
         client.readTimeout(20 * 1000, TimeUnit.MILLISECONDS);
         client.connectTimeout(15 * 1000, TimeUnit.MILLISECONDS);
-        //设置缓存路径
-        File httpCacheDirectory = new File(BaseApp.getAppContext().getCacheDir(), "okhttpCache");
-        //设置缓存 10M
-        Cache cache = new Cache(httpCacheDirectory, 10 * 1024 * 1024);
-        client.cache(cache);
+        if(needCache) {
+            //设置缓存路径
+            File httpCacheDirectory = new File(BaseApp.getAppContext().getCacheDir(), "okhttpCache");
+            //设置缓存 10M
+            Cache cache = new Cache(httpCacheDirectory, 10 * 1024 * 1024);
+            client.cache(cache);
+            client.addInterceptor(REWRITE_CACHE_CONTROL_INTERCEPTOR);
+        }else{
+            client.addInterceptor(NO_CACHE_CONTROL_INTERCEPTOR);
+        }
         //设置拦截器
-        client.addInterceptor(LoggingInterceptor);
-        client.addNetworkInterceptor(REWRITE_CACHE_CONTROL_INTERCEPTOR);
-        client.addInterceptor(REWRITE_CACHE_CONTROL_INTERCEPTOR);
+//        client.addNetworkInterceptor(REWRITE_CACHE_CONTROL_INTERCEPTOR);
+//        client.addInterceptor(REWRITE_CACHE_CONTROL_INTERCEPTOR);
 
+        client.addInterceptor(LOGGING_INTERCEPTOR);
 
         SSLSocketFactory sslSocketFactory = HttpsUtils.getSslSocketFactory(null, null, null);
         client.sslSocketFactory(sslSocketFactory)
@@ -90,7 +89,7 @@ public class NetManager {
         return client.build();
     }
 
-    private static final Interceptor LoggingInterceptor = new Interceptor() {
+    private static final Interceptor LOGGING_INTERCEPTOR = new Interceptor() {
         @Override
         public Response intercept(Interceptor.Chain chain) throws IOException {
             Request request = chain.request();
@@ -107,7 +106,6 @@ public class NetManager {
     };
 
     private static final Interceptor REWRITE_CACHE_CONTROL_INTERCEPTOR = new Interceptor() {
-
 
         @Override
         public Response intercept(Interceptor.Chain chain) throws IOException {
@@ -127,18 +125,29 @@ public class NetManager {
 //                        .build();
 
             //方案二：无网读缓存，有网根据过期时间重新请求
-            boolean netWorkConection = NetUtils.hasNetWorkConection(BaseApp.getAppContext());
+
             Request request = chain.request();
             Request.Builder builder = request.newBuilder();
-            if (!netWorkConection) {
+
+            boolean netWorkConnection = NetUtils.hasNetWorkConection(BaseApp.getAppContext());
+            if (!netWorkConnection) {
                 builder.cacheControl(CacheControl.FORCE_CACHE);
             }
-            request = builder.header("Authorization", token)
-                    .header("Accept", "application/json")
-                    .build();
+
+            builder.header("Accept", "application/json");
+
+            if (heads != null && heads.size() > 0) {
+                final Set<String> keys = heads.keySet();
+                for (String key : keys) {
+                    builder.header(key, heads.get(key));
+                }
+            }
+
+            request = builder.build();
 
             Response response = chain.proceed(request);
-            if (netWorkConection) {
+
+            if (netWorkConnection) {
                 //有网的时候读接口上的@Headers里的配置，你可以在这里进行统一的设置
                 String cacheControl = request.cacheControl().toString();
                 response.newBuilder()
@@ -153,6 +162,22 @@ public class NetManager {
                         .build();
             }
             return response;
+        }
+    };
+
+    private static final Interceptor NO_CACHE_CONTROL_INTERCEPTOR = new Interceptor() {
+
+        @Override
+        public Response intercept(Interceptor.Chain chain) throws IOException {
+            Request request = chain.request();
+            Request.Builder builder = request.newBuilder();
+            builder.header("Accept", "application/json");
+
+            CacheControl.Builder cacheBuilder = new CacheControl.Builder();
+            CacheControl cacheControl = cacheBuilder.noCache().noStore().build();
+            request = builder.cacheControl(cacheControl).build();
+
+            return chain.proceed(request);
         }
     };
 }
